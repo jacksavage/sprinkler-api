@@ -1,15 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from gpiozero.pins.native import NativeFactory
 from gpiozero import OutputDevice
 import threading
 import time
 
+factory = NativeFactory()
 app = FastAPI()
 
 ZONE_PINS = {
-    1: OutputDevice(16),
-    2: OutputDevice(20),
-    3: OutputDevice(21),
+    1: OutputDevice(16, pin_factory=factory),
+    2: OutputDevice(20, pin_factory=factory),
+    3: OutputDevice(21, pin_factory=factory),
 }
 
 class Duration(BaseModel):
