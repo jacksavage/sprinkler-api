@@ -1,9 +1,10 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from gpiozero.pins.native import NativeFactory
 from gpiozero import OutputDevice
 import threading
-import time
+from typing import List
 
 factory = NativeFactory()
 app = FastAPI()
@@ -14,62 +15,67 @@ ZONE_PINS = {
     3: OutputDevice(21, pin_factory=factory),
 }
 
-class Duration(BaseModel):
-    duration: float  # seconds
+class ScheduleItem(BaseModel):
+    zone_id: int
+    duration_seconds: float
 
-current_thread = None
-stop_thread = False
+current_timer = None
+stop_event = threading.Event()
 
-def turn_on_zone_pin(zone_id: int, duration: float):
-    global stop_thread
-
-    # Turn off all zones
+def set_zones_on(zones: List[int]):
+    # turn all zones off
     for device in ZONE_PINS.values():
         device.off()
 
-    # Turn on the selected zone
-    pin = ZONE_PINS[zone_id]
-    pin.on()
+    # turn on the requested zones
+    for zone in zones:
+        if zone not in ZONE_PINS:
+            raise HTTPException(status_code=400, detail=f"Zone {zone} does not exist")
+        ZONE_PINS[zone].on()
 
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        if stop_thread:
-            break
-        time.sleep(0.1)
+def process_schedule(schedule: List[ScheduleItem]):
+    try:
+        # process each item in the schedule
+        for item in schedule:
+            # check the stop event
+            if stop_event.is_set():
+                break
 
-    pin.off()
+            # turn on the zone
+            set_zones_on([item.zone_id])
 
-@app.post("/zones/{zone_id}")
-def toggle(zone_id: int, duration: Duration):
-    global current_thread, stop_thread
+            # wait for the duration of the item or the stop event
+            stop_event.wait(item.duration_seconds)
+    finally:
+        # always turn off all zones when we are done
+        set_zones_on([])
 
-    if zone_id not in ZONE_PINS:
-        raise HTTPException(status_code=400, detail="Invalid zone ID")
+@app.post("/schedule")
+def set_schedule(schedule: List[ScheduleItem]):
+    global current_timer, stop_event
 
-    # Stop the previous thread if it's still running
-    if current_thread and current_thread.is_alive():
-        stop_thread = True
-        current_thread.join()  # Wait for the thread to stop
+    # stop the previous schedule if it's still running
+    if current_timer and current_timer.is_alive():
+        # ask thread to stop running
+        stop_event.set()
 
-    # Reset stop signal and start a new thread for the new zone
-    stop_thread = False
-    current_thread = threading.Thread(target=turn_on_zone_pin, args=(zone_id, duration.duration))
-    current_thread.start()
+        # wait for it to do so
+        current_timer.join()
 
-    return {"message": f"Zone {zone_id} activated for {duration.duration} seconds"}
+    # if a schedule is provided
+    if schedule:
+        # run it on a new thread
+        stop_event.clear()
+        current_timer = threading.Thread(target=process_schedule, args=(schedule,))
+        current_timer.start()
+        return {"message": "New schedule started"}
+    else:
+        # otherwise no action is needed
+        return {"message": "All zones off"}
 
-# Endpoint to turn off all zones
-@app.post("/zones")
-def turn_off_all_zones():
-    global stop_thread
-
-    # Stop any running thread
-    if current_thread and current_thread.is_alive():
-        stop_thread = True
-        current_thread.join()
-
-    # Turn off all zones
-    for device in ZONE_PINS.values():
-        device.off()
-
-    return {"message": "All zones turned off"}
+# turn off all zones when the server starts and stops
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    set_zones_on([])
+    yield
+    set_zones_on([])
