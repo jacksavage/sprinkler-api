@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from gpiozero.pins.native import NativeFactory
 from gpiozero import OutputDevice
@@ -50,7 +51,7 @@ def process_schedule(schedule: List[ScheduleItem]):
         # always turn off all zones when we are done
         turn_off_all_zones()
 
-@app.post("/schedule")
+@app.post("/api/schedule")
 def set_schedule(schedule: List[ScheduleItem]):
     global current_timer, stop_event
 
@@ -79,3 +80,6 @@ async def lifespan(app: FastAPI):
     turn_off_all_zones()
     yield
     turn_off_all_zones()
+
+# serve the client
+app.mount("/", StaticFiles(directory="./static", html=True))

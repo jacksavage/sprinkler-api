@@ -28,39 +28,46 @@ export function SprinklerControl() {
 
   const executeSchedule = async () => {
     try {
-      const response = await fetch('/api/execute-schedule', {
-        method: 'POST',
+      const response = await fetch("/api/schedule", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(zones.filter(zone => zone.enabled)),
-      })
+        body: JSON.stringify(
+          zones
+            .filter((zone) => zone.enabled)
+            .map((zone) => ({
+              zone_id: zone.id,
+              duration_seconds: zone.duration * 60,
+            }))
+        ),
+      });
       if (response.ok) {
-        alert('Schedule execution command sent successfully!')
+        alert("Schedule execution command sent successfully!");
       } else {
-        alert('Failed to send execute schedule command')
+        alert("Failed to send execute schedule command");
       }
     } catch (error) {
-      console.error('Error sending execute schedule command:', error)
-      alert('An error occurred while sending the execute schedule command')
+      console.error("Error sending execute schedule command:", error);
+      alert("An error occurred while sending the execute schedule command");
     }
-  }
+  };
 
   const stopSprinklers = async () => {
     try {
-      const response = await fetch('/api/stop-sprinklers', {
-        method: 'POST',
-      })
+      const response = await fetch("/api/schedule", {
+        method: "POST",
+      });
       if (response.ok) {
-        alert('Stop command sent successfully!')
+        alert("Stop command sent successfully!");
       } else {
-        alert('Failed to send stop command')
+        alert("Failed to send stop command");
       }
     } catch (error) {
-      console.error('Error sending stop command:', error)
-      alert('An error occurred while sending the stop command')
+      console.error("Error sending stop command:", error);
+      alert("An error occurred while sending the stop command");
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-md mx-auto">
