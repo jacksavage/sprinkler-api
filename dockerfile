@@ -8,6 +8,8 @@ RUN yarn run build
 FROM --platform=${BUILDPLATFORM} python:3.9-slim
 WORKDIR /server
 COPY server/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip --version
 RUN pip install --no-cache-dir -r requirements.txt
 COPY server/ .
 RUN mkdir -p static
