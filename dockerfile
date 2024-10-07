@@ -1,11 +1,11 @@
-FROM node:22 as client-builder
+FROM node:22 AS client-builder
 WORKDIR /client
 COPY client/package.json client/yarn.lock ./
 RUN yarn install
 COPY client/ ./
 RUN yarn run build
 
-FROM --platform=linux/arm/v6 python:3.9-slim
+FROM --platform=${BUILDPLATFORM} python:3.9-slim
 WORKDIR /server
 COPY server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
