@@ -5,7 +5,7 @@ RUN yarn install
 COPY client/ ./
 RUN yarn run build
 
-FROM python:3.9-slim
+FROM --platform=linux/arm/v6 python:3.9-slim
 WORKDIR /server
 COPY server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
