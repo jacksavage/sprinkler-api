@@ -22,16 +22,16 @@ class ScheduleItem(BaseModel):
 current_timer = None
 stop_event = threading.Event()
 
-def set_zones_on(zones: List[int]):
-    # turn all zones off
+def turn_off_all_zones():
     for device in ZONE_PINS.values():
         device.off()
 
-    # turn on the requested zones
-    for zone in zones:
-        if zone not in ZONE_PINS:
-            raise HTTPException(status_code=400, detail=f"Zone {zone} does not exist")
-        ZONE_PINS[zone].on()
+def turn_on_zone(zone: int):
+    turn_off_all_zones()
+
+    if zone not in ZONE_PINS:
+        raise HTTPException(status_code=400, detail=f"Zone {zone} does not exist")
+    ZONE_PINS[zone].on()
 
 def process_schedule(schedule: List[ScheduleItem]):
     try:
@@ -42,13 +42,13 @@ def process_schedule(schedule: List[ScheduleItem]):
                 break
 
             # turn on the zone
-            set_zones_on([item.zone_id])
+            turn_on_zone(item.zone_id)
 
             # wait for the duration of the item or the stop event
             stop_event.wait(item.duration_seconds)
     finally:
         # always turn off all zones when we are done
-        set_zones_on([])
+        turn_off_all_zones()
 
 @app.post("/schedule")
 def set_schedule(schedule: List[ScheduleItem]):
@@ -76,6 +76,6 @@ def set_schedule(schedule: List[ScheduleItem]):
 # turn off all zones when the server starts and stops
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    set_zones_on([])
+    turn_off_all_zones()
     yield
-    set_zones_on([])
+    turn_off_all_zones()
