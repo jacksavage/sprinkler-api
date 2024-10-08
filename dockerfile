@@ -9,6 +9,10 @@ ARG BUILDPLATFORM
 FROM --platform=${BUILDPLATFORM} python:3.9-slim
 WORKDIR /server
 COPY server/requirements.txt .
+RUN apt-get update && apt-get install -y \
+  curl \
+  build-essential \
+  gcc
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN pip install --no-cache-dir --upgrade pip \
