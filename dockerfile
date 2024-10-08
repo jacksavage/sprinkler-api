@@ -5,6 +5,7 @@ RUN yarn install
 COPY client/ ./
 RUN yarn run build
 
+ARG BUILDPLATFORM
 FROM --platform=${BUILDPLATFORM} python:3.9-slim
 WORKDIR /server
 COPY server/requirements.txt .
