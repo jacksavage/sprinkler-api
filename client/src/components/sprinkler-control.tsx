@@ -57,6 +57,10 @@ export function SprinklerControl() {
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: "[]",
       });
       if (response.ok) {
         alert("Stop command sent successfully!");
