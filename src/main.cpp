@@ -16,7 +16,7 @@ TaskHandle_t scheduleTaskHandle = nullptr;
 volatile bool stopFlag = false;
 
 void allZonesOff() {
-    for (int i = 1; i <= NUM_ZONES; i++) {
+    for (int i = 0; i < NUM_ZONES; i++) {
         digitalWrite(ZONE_PINS[i], LOW);
     }
 }
@@ -26,7 +26,7 @@ void runScheduleTask(void* param) {
 
     for (const auto& item : *items) {
         if (stopFlag) break;
-        if (item.zone_id < 1 || item.zone_id > NUM_ZONES) continue;
+        if (item.zone_id < 0 || item.zone_id >= NUM_ZONES) continue;
 
         allZonesOff();
         digitalWrite(ZONE_PINS[item.zone_id], HIGH);
@@ -69,7 +69,7 @@ void setup() {
     Serial.begin(115200);
 
     // Initialise zone pins, all off
-    for (int i = 1; i <= NUM_ZONES; i++) {
+    for (int i = 0; i < NUM_ZONES; i++) {
         pinMode(ZONE_PINS[i], OUTPUT);
         digitalWrite(ZONE_PINS[i], LOW);
     }

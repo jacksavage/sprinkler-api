@@ -11,8 +11,8 @@ Runs zones sequentially in the order given. Send an empty array to stop all zone
 **Request**
 ```json
 [
-  { "zone_id": 1, "duration_seconds": 300 },
-  { "zone_id": 2, "duration_seconds": 600 }
+  { "zone_id": 0, "duration_seconds": 300 },
+  { "zone_id": 1, "duration_seconds": 600 }
 ]
 ```
 
@@ -21,15 +21,15 @@ Runs zones sequentially in the order given. Send an empty array to stop all zone
 { "message": "Schedule started" }
 ```
 
-Zone IDs are `1`, `2`, or `3`. Zones run one at a time; a new request cancels any running schedule before starting the new one.
+Zone IDs are `0`, `1`, or `2`. Zones run one at a time; a new request cancels any running schedule before starting the new one.
 
 ### Zone → GPIO mapping
 
 | Zone | XIAO pin | GPIO |
 |------|----------|------|
-| 1    | D0       | 2    |
-| 2    | D1       | 3    |
-| 3    | D2       | 4    |
+| 0    | D0       | 2    |
+| 1    | D1       | 3    |
+| 2    | D2       | 4    |
 
 Connect relay module inputs to D0–D2. Pin mapping can be changed in `include/config.h`.
 
@@ -42,30 +42,34 @@ Connect relay module inputs to D0–D2. Pin mapping can be changed in `include/c
 - **VS Code**: install the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
 - **CLI**: `pip install platformio`
 
-### 2. Configure WiFi credentials
+### 2. Set WiFi credentials via 1Password CLI
 
-Edit `include/config.h`:
-```cpp
-#define WIFI_SSID     "your_network"
-#define WIFI_PASSWORD "your_password"
+WiFi credentials are injected at build time via environment variables (`${sysenv.WIFI_SSID}` / `${sysenv.WIFI_PASSWORD}` in `platformio.ini`).
+
+> **VS Code GUI caveat:** the PlatformIO extension only sees env vars that existed when VS Code was launched. The fix is to set the vars in PowerShell *then* open VS Code from that same session — it will inherit them, and the Upload button works normally.
+
+**PowerShell — set creds and open VS Code:**
+```powershell
+$env:WIFI_SSID     = op read "op://Private/sasquatch wifi/network name"
+$env:WIFI_PASSWORD = op read "op://Private/sasquatch wifi/wireless network password"
+code .
 ```
 
-### 3. Build and upload
+Then click the **Upload** arrow (→) in the PlatformIO toolbar as usual.
 
-Connect the XIAO ESP32-C3 via USB-C, then:
-
-**VS Code**: click the **Upload** arrow (→) in the PlatformIO toolbar.
-
-**CLI**:
-```bash
+**PowerShell — CLI upload (no VS Code needed):**
+```powershell
+$env:WIFI_SSID     = op read "op://Private/sasquatch wifi/network name"
+$env:WIFI_PASSWORD = op read "op://Private/sasquatch wifi/wireless network password"
+$env:PATH         += ";${env:USERPROFILE}\.platformio\penv\Scripts"
 pio run --target upload
 ```
 
-### 4. Find the IP address
+### 3. Find the IP address
 
 Open the serial monitor (115200 baud) immediately after boot:
 
-```bash
+```powershell
 pio device monitor
 ```
 
