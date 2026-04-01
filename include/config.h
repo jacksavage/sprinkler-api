@@ -8,5 +8,5 @@
 // Zone 0 -> D0 (GPIO2)
 // Zone 1 -> D1 (GPIO3)
 // Zone 2 -> D2 (GPIO4)
-const int NUM_ZONES = 3;
-const int ZONE_PINS[NUM_ZONES] = {2, 3, 4};
+const int ZONE_PINS[] = {2, 3, 4};
+constexpr int NUM_ZONES = sizeof(ZONE_PINS) / sizeof(ZONE_PINS[0]);
