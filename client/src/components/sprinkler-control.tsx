@@ -26,41 +26,35 @@ export function SprinklerControl() {
     setZones(zones.map(zone => zone.id === id ? { ...zone, enabled: !zone.enabled } : zone))
   }
 
-  const executeSchedule = async () => {
+  const executeProgram = async () => {
     try {
-      const response = await fetch("/api/schedule", {
+      const program = zones.map(zone => zone.enabled ? zone.duration * 60 : 0);
+      const response = await fetch("/api/program", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(
-          zones
-            .filter((zone) => zone.enabled)
-            .map((zone) => ({
-              zone_id: zone.id,
-              duration_seconds: zone.duration * 60,
-            }))
-        ),
+        body: JSON.stringify({ schedule: "now", program }),
       });
       if (response.ok) {
-        alert("Schedule execution command sent successfully!");
+        alert("Program started successfully!");
       } else {
-        alert("Failed to send execute schedule command");
+        alert("Failed to start program");
       }
     } catch (error) {
-      console.error("Error sending execute schedule command:", error);
-      alert("An error occurred while sending the execute schedule command");
+      console.error("Error starting program:", error);
+      alert("An error occurred while starting the program");
     }
   };
 
   const stopSprinklers = async () => {
     try {
-      const response = await fetch("/api/schedule", {
+      const response = await fetch("/api/program", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: "[]",
+        body: JSON.stringify({ schedule: "now", program: Array(zones.length).fill(0) }),
       });
       if (response.ok) {
         alert("Stop command sent successfully!");
@@ -102,8 +96,8 @@ export function SprinklerControl() {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <div className="flex space-x-2 w-full">
-          <Button onClick={executeSchedule} className="flex-1">
-            Execute Schedule
+          <Button onClick={executeProgram} className="flex-1">
+            Run Program
           </Button>
           <Button onClick={stopSprinklers} className="flex-1" variant="destructive">
             Stop

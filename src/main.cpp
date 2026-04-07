@@ -7,11 +7,6 @@
 
 AsyncWebServer server(80);
 
-struct ScheduleItem {
-    int zone_id;
-    float duration_seconds;
-};
-
 TaskHandle_t scheduleTaskHandle = nullptr;
 volatile bool stopFlag = false;
 
@@ -22,16 +17,17 @@ void allZonesOff() {
 }
 
 void runScheduleTask(void* param) {
-    auto* items = (std::vector<ScheduleItem>*)param;
+    auto* durations = (std::vector<int>*)param;
 
-    for (const auto& item : *items) {
+    for (int i = 0; i < (int)durations->size(); i++) {
         if (stopFlag) break;
-        if (item.zone_id < 0 || item.zone_id >= NUM_ZONES) continue;
+        int duration_seconds = (*durations)[i];
+        if (duration_seconds <= 0) continue;  // skip zones with zero duration
 
         allZonesOff();
-        digitalWrite(ZONE_PINS[item.zone_id], HIGH);
+        digitalWrite(ZONE_PINS[i], HIGH);
 
-        uint32_t duration_ms = (uint32_t)(item.duration_seconds * 1000.0f);
+        uint32_t duration_ms = (uint32_t)(duration_seconds * 1000);
         uint32_t elapsed = 0;
         while (elapsed < duration_ms && !stopFlag) {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -40,12 +36,12 @@ void runScheduleTask(void* param) {
     }
 
     allZonesOff();
-    delete items;
+    delete durations;
     scheduleTaskHandle = nullptr;
     vTaskDelete(nullptr);
 }
 
-// Stop any running schedule and turn all zones off.
+// Stop any running program and turn all zones off.
 // Safe to call from the async web server task context.
 void stopCurrentSchedule() {
     if (scheduleTaskHandle == nullptr) return;
@@ -89,15 +85,18 @@ void setup() {
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
 
     // CORS preflight
-    server.on("/api/schedule", HTTP_OPTIONS, [](AsyncWebServerRequest* request) {
+    server.on("/api/program", HTTP_OPTIONS, [](AsyncWebServerRequest* request) {
         request->send(204);
     });
 
-    // POST /api/schedule
+    // POST /api/program
+    // Body: { "schedule": "now" | "<cron expression>", "program": [<seconds per zone>, ...] }
+    // - "schedule": "now" runs immediately; cron expressions are not yet supported.
+    // - "program": array of integers, one per zone in order. Zero means the zone is skipped.
     // Body chunks are accumulated into a String stored on request->_tempObject,
     // then parsed once the full body has arrived.
     server.on(
-        "/api/schedule",
+        "/api/program",
         HTTP_POST,
         // Called after the full body has been received
         [](AsyncWebServerRequest* request) {
@@ -117,24 +116,49 @@ void setup() {
                 return;
             }
 
+            if (!doc["schedule"].is<const char*>()) {
+                request->send(400, "application/json", "{\"error\":\"Missing or invalid 'schedule' field\"}");
+                return;
+            }
+
+            if (!doc["program"].is<JsonArray>()) {
+                request->send(400, "application/json", "{\"error\":\"Missing or invalid 'program' field\"}");
+                return;
+            }
+
+            String scheduleStr = doc["schedule"].as<String>();
+            if (scheduleStr != "now") {
+                request->send(400, "application/json", "{\"error\":\"Cron scheduling not yet supported; use \\\"now\\\"\"}");
+                return;
+            }
+
+            JsonArray arr = doc["program"].as<JsonArray>();
+            if ((int)arr.size() != NUM_ZONES) {
+                char msg[80];
+                snprintf(msg, sizeof(msg), "{\"error\":\"'program' must have exactly %d entries\"}", NUM_ZONES);
+                request->send(400, "application/json", msg);
+                return;
+            }
+
+            auto* durations = new std::vector<int>();
+            durations->reserve(NUM_ZONES);
+            bool anyActive = false;
+            for (JsonVariant v : arr) {
+                int secs = v.as<int>();
+                durations->push_back(secs);
+                if (secs > 0) anyActive = true;
+            }
+
             stopCurrentSchedule();
 
-            JsonArray arr = doc.as<JsonArray>();
-            if (arr.size() == 0) {
+            if (!anyActive) {
+                delete durations;
                 request->send(200, "application/json", "{\"message\":\"All zones stopped\"}");
                 return;
             }
 
-            auto* items = new std::vector<ScheduleItem>();
-            for (JsonObject obj : arr) {
-                ScheduleItem item;
-                item.zone_id = obj["zone_id"].as<int>();
-                item.duration_seconds = obj["duration_seconds"].as<float>();
-                items->push_back(item);
-            }
-
-            xTaskCreate(runScheduleTask, "schedule", 4096, items, 1, &scheduleTaskHandle);
-            request->send(200, "application/json", "{\"message\":\"Schedule started\"}");
+            xTaskCreate(runScheduleTask, "schedule", 4096, durations, 1, &scheduleTaskHandle);
+            request->send(200, "application/json", "{\"message\":\"Program started\"}");
         },
         nullptr, // upload handler (unused)
         // Body chunk handler
